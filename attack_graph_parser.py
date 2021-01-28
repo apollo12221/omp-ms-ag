@@ -278,12 +278,14 @@ def breadth_first_search(topology,
 
     nodeLimit = 10000
     edgeLimit = 2500000
-    labelPerNode = 1
+    labelPerNode = 100
+
+    bfs.restype = ctypes.POINTER(ctypes.c_int*(edgeLimit*labelPerNode))
 
     IntArrayOne = ctypes.c_int*1
     IntArrayNode = ctypes.c_int*nodeLimit
     IntArrayEdge = ctypes.c_int*edgeLimit
-    IntArrayLabel = ctypes.c_int*(edgeLimit*labelPerNode)
+    #IntArrayLabel = ctypes.c_int*(edgeLimit*labelPerNode)
 
     nodeCnt = IntArrayOne(*[0])
     edgeCnt = IntArrayOne(*[0])
@@ -291,13 +293,17 @@ def breadth_first_search(topology,
     nodePriv = IntArrayNode(*[-1 for i in range(nodeLimit)])
     edgeStart = IntArrayEdge(*[-1 for i in range(edgeLimit)])
     edgeEnd = IntArrayEdge(*[-1 for i in range(edgeLimit)])
-    edgeLabel = IntArrayLabel(*[-1 for i in range(edgeLimit*labelPerNode)])
+    #edgeLabel = IntArrayLabel(*[-1 for i in range(edgeLimit*labelPerNode)])
     
         
 
-    res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_id, param_docker_host_id, param_max_num_ex, nodeName, nodePriv, edgeStart, edgeEnd, edgeLabel, nodeCnt, edgeCnt)
+    res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_id, param_docker_host_id, param_max_num_ex, nodeName, nodePriv, edgeStart, edgeEnd, nodeCnt, edgeCnt)
 
-    print("====>>>> Result is", res)
+    
+
+    print("====>>>> Done!!!")
+    print(res.contents[2500000*100-1])
+    print(res.contents[0])
     ####################################################################
 
 
