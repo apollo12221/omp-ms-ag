@@ -178,6 +178,7 @@ def breadth_first_search(topology,
                          priviledged_access):
     """Breadth first search approach for generation of nodes and edges
     without generating attack paths."""
+    bds_start = time.time()
 
     #########################################################
     # encoding all containers
@@ -275,7 +276,26 @@ def breadth_first_search(topology,
     param_docker_host_id = docker_host_id
     param_max_num_ex = max_num_ex
 
-    res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_id, param_docker_host_id, param_max_num_ex)
+    nodeLimit = 10000
+    edgeLimit = 2500000
+    labelPerNode = 1
+
+    IntArrayOne = ctypes.c_int*1
+    IntArrayNode = ctypes.c_int*nodeLimit
+    IntArrayEdge = ctypes.c_int*edgeLimit
+    IntArrayLabel = ctypes.c_int*(edgeLimit*labelPerNode)
+
+    nodeCnt = IntArrayOne(*[0])
+    edgeCnt = IntArrayOne(*[0])
+    nodeName = IntArrayNode(*[-1 for i in range(nodeLimit)])
+    nodePriv = IntArrayNode(*[-1 for i in range(nodeLimit)])
+    edgeStart = IntArrayEdge(*[-1 for i in range(edgeLimit)])
+    edgeEnd = IntArrayEdge(*[-1 for i in range(edgeLimit)])
+    edgeLabel = IntArrayLabel(*[-1 for i in range(edgeLimit*labelPerNode)])
+    
+        
+
+    res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_id, param_docker_host_id, param_max_num_ex, nodeName, nodePriv, edgeStart, edgeEnd, edgeLabel, nodeCnt, edgeCnt)
 
     print("====>>>> Result is", res)
     ####################################################################
@@ -298,7 +318,6 @@ def breadth_first_search(topology,
     passed_nodes["outside|4"] = True
 
     # Starting the time
-    bds_start = time.time()
     while not queue.empty():
 
         parts_current = queue.get().split("|")
