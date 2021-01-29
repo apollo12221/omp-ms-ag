@@ -173,69 +173,12 @@ def add_edge(nodes,
 
     return nodes, edges, passed_edges
 
-
-def add_edge1(nodes,
-             edges,
-             node_start,
-             node_start_priv,
-             node_end,
-             node_end_priv,
-             edge_desc,
-             passed_edges,
-             passed_nodes,
-             queue,
-             node_end_priv_val):
-    """Adding an edge to the attack graph and checking if nodes already exist."""
-
-    
-    """for key in edges.keys():
-        if key.endswith(node_start):
-            container = node_end.split("(")[0]
-            if key.startswith(container):
-                return nodes, edges, passed_edges"""
-
-    # Checks if the opposite edge is already in the collection. If it is, dont add the edge.
-    node_start_full = node_start + "(" + node_start_priv + ")"
-    node_end_full = node_end+ "(" + node_end_priv + ")"
-
-    node = passed_edges.get(node_end + "|" + node_start_full)
-    if node == None:
-        passed_edges[ node_start + "|" + node_end_full ] = True
-    else:
-        #print("oops")
-        return nodes, edges, passed_edges, passed_nodes, queue
-
-    if node_start_full not in nodes:
-        nodes.add(node_start_full)
-
-    if node_end not in nodes:
-        nodes.add(node_end_full)
-
-    key = node_start_full + "|" + node_end_full 
-
-    edge = edges.get(key)
-    if edge == None:
-        edges[key] = [edge_desc]
-    else:
-        edge.append(edge_desc)
-        edges[key] = edge
-
-    passed_nodes_key = node_end + "|" + str(node_end_priv_val)
-    if passed_nodes.get(passed_nodes_key) == None:
-        # ... put it in the queue
-        queue.put(passed_nodes_key)
-        passed_nodes[passed_nodes_key] = True
-
-    return nodes, edges, passed_edges, passed_nodes, queue
-
-
 def breadth_first_search(topology,
                          container_exploitability,
                          priviledged_access):
     """Breadth first search approach for generation of nodes and edges
     without generating attack paths."""
-    bds_start = time.time()
-
+    c_start = time.time()
     #########################################################
     # encoding all containers
     container_encoding = {} #map container name to encoding number
@@ -328,8 +271,8 @@ def breadth_first_search(topology,
     param_post_priv_list = IntArrayEx(*post_priv)
     param_pacc_list = IntArrayCont(*pacc_list)
     param_cont_cnt = cont_cnt
-    param_outside_id = outside_id
-    param_docker_host_id = docker_host_id
+    param_outside_name = outside_id
+    param_docker_host_name = docker_host_id
     param_max_num_ex = max_num_ex
 
     nodeLimit = 10000
@@ -338,30 +281,34 @@ def breadth_first_search(topology,
 
     bfs.restype = ctypes.POINTER(ctypes.c_int*(edgeLimit*labelPerNode))
 
-    IntArrayOne = ctypes.c_int*1
-    IntArrayNode = ctypes.c_int*nodeLimit
-    IntArrayEdge = ctypes.c_int*edgeLimit
+    IntArrayOne = ctypes.c_uint*1
+    IntArrayNode = ctypes.c_uint*nodeLimit
+    IntArrayEdge = ctypes.c_uint*edgeLimit
     #IntArrayLabel = ctypes.c_int*(edgeLimit*labelPerNode)
 
     nodeCnt = IntArrayOne(*[0])
     edgeCnt = IntArrayOne(*[0])
-    nodeName = IntArrayNode(*[-1 for i in range(nodeLimit)])
-    nodePriv = IntArrayNode(*[-1 for i in range(nodeLimit)])
-    edgeStart = IntArrayEdge(*[-1 for i in range(edgeLimit)])
-    edgeEnd = IntArrayEdge(*[-1 for i in range(edgeLimit)])
+    nodeName = IntArrayNode(*[0 for i in range(nodeLimit)])
+    nodePriv = IntArrayNode(*[0 for i in range(nodeLimit)])
+    edgeStart = IntArrayEdge(*[0 for i in range(edgeLimit)])
+    edgeEnd = IntArrayEdge(*[0 for i in range(edgeLimit)])
     #edgeLabel = IntArrayLabel(*[-1 for i in range(edgeLimit*labelPerNode)])
     
         
 
-    res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_id, param_docker_host_id, param_max_num_ex, nodeName, nodePriv, edgeStart, edgeEnd, nodeCnt, edgeCnt)
+    res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_name, param_docker_host_name, param_max_num_ex, nodeName, nodePriv, edgeStart, edgeEnd, nodeCnt, edgeCnt)
 
-    
-
-    print("====>>>> Done!!!")
-    print(res.contents[2500000*100-1])
-    print(res.contents[0])
+     
+    c_duration=time.time()-c_start
+    print("====== From Python: C execution done!!!")
+    print("Number of nodes discovered by C is", nodeCnt[0])
+    print("Number of edges discovered by C is", edgeCnt[0])
+    print("Breadth-First-Search by serial C took",c_duration,"seconds")
+    #print(res.contents[2500000*100-1])
+    #print(res.contents[0])
     ####################################################################
 
+    bds_start = time.time()
 
     # This is where the nodes and edges are going to be stored.
     edges = {}
@@ -432,27 +379,25 @@ def breadth_first_search(topology,
                         (neighbour == current_node and priv_current < postcond[vul])):
 
                         # Add the edge
-                        nodes, edges, passed_edges, passed_nodes, queue = add_edge1(nodes,
+                        nodes, edges, passed_edges = add_edge(nodes,
                                                               edges,
                                                               current_node,
                                                               get_priv(priv_current),
                                                               neighbour,
                                                               get_priv(postcond[vul]),
                                                               vul,
-                                                              passed_edges,
-                                                              passed_nodes,
-                                                              queue,
-                                                              postcond[vul])
+                                                              passed_edges)
 
                         # If the neighbour was not passed or it has a lower privilege...
-                        #passed_nodes_key = neighbour + "|" + str(postcond[vul])
-                        #if passed_nodes.get(passed_nodes_key) == None:
+                        passed_nodes_key = neighbour + "|" + str(postcond[vul])
+                        if passed_nodes.get(passed_nodes_key) == None:
                             # ... put it in the queue
-                            #queue.put(passed_nodes_key)
-                            #passed_nodes[passed_nodes_key] = True
+                            queue.put(passed_nodes_key)
+                            passed_nodes[passed_nodes_key] = True
 
     duration_bdf = time.time()-bds_start
-    print("Breadth-first-search took "+str(duration_bdf)+" seconds.")
+    print()
+    print("Breadth-first-search by Python took "+str(duration_bdf)+" seconds.")
     return nodes, edges, duration_bdf
 
 
