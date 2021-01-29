@@ -294,9 +294,10 @@ def breadth_first_search(topology,
     edgeEnd = IntArrayEdge(*[0 for i in range(edgeLimit)])
     #edgeLabel = IntArrayLabel(*[-1 for i in range(edgeLimit*labelPerNode)])
     
-        
+    numOpenmpThreads = 2
+    initQueueSize = 2
 
-    res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_name, param_docker_host_name, param_max_num_ex, nodeName, nodePriv, edgeStart, edgeEnd, nodeCnt, edgeCnt)
+    res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_name, param_docker_host_name, param_max_num_ex, nodeName, nodePriv, edgeStart, edgeEnd, nodeCnt, edgeCnt, numOpenmpThreads, initQueueSize)
 
      
     c_duration=time.time()-c_start
