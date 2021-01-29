@@ -629,9 +629,11 @@ def generate_attack_graph(attack_vector_path,
     """Main pipeline for the attack graph generation algorithm."""
 
     print("Start with attack graph generation...")
-
+    
+    t_start = time.time()
     # Read the attack vector files.
     attack_vector_files = reader.read_attack_vector_files(attack_vector_path)
+    print("Attack vector reading took", time.time()-t_start, "seconds");
 
     print("Vulnerabilities preprocessing started.")
     time_start = time.time()
