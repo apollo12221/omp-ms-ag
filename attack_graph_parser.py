@@ -189,25 +189,21 @@ def breadth_first_search(topology,
         container_decoding[cont_cnt]=i
         cont_cnt += 1
 
-    #print("===>>> container encoding dict: ")
-    #print(container_encoding)
-    #print("===>>> container decoding dict: ")
-    #print(container_decoding)
-    #print('===>>> Number of containers is', cont_cnt)
     outside_id = container_encoding['outside'] ################ pass to c function
     docker_host_id = container_encoding['docker host'] ################ pass to c function
-    #print('===>>> outside id is', outside_id)
-    #print('===>>> docker host id is', docker_host_id)
 
     # build topology matrix as 1D array
     topology_list = [0 for i in range(cont_cnt**2)] ################ pass to c function: topology matrix
+
     for i in topology.keys():
         for j in topology[i]:
             topology_list[container_encoding[i]*cont_cnt+container_encoding[j]]=1
-    #print('===>>> topology list samples')
-    #print(topology_list[0:2*cont_cnt])
-    #print(topology_list[-cont_cnt:cont_cnt**2])
-
+        # add reflective edges. 
+        # The original python program forgot to delete these edges after graph is generated
+        if i!= "docker host" and i!= "outside":
+            topology[i].append(i)
+            topology[i].append(i)
+    
     # encoding all exploits
     exploit_encoding = {}
     exploit_decoding = {}
@@ -224,12 +220,7 @@ def breadth_first_search(topology,
                 exploit_encoding[j]=ex_total
                 exploit_decoding[ex_total]=j
                 ex_total += 1
-
-    #print("===>>> Max number of exploits of all containers is", max_num_ex)
-    #print("===>>> Total number of encoded exploits is", ex_total)
-    #print("===>>> Number of exploits owned by each container is")
-    #print(num_ex)
-    
+   
     # build precondition name matrix as 1D array, size cont_cnt * max_num_ex
     ex_names = [-1 for i in range(cont_cnt * max_num_ex)] ############### pass to c function: initially -1 means an empty entry
     pre_priv = [0 for i in range(cont_cnt * max_num_ex)] ############## pass to c function: initially 0 means None privilege
@@ -242,19 +233,10 @@ def breadth_first_search(topology,
             post_priv[container_encoding[i]*max_num_ex + ex_cnt]=container_exploitability[i]['postcond'][j]
             ex_cnt += 1
 
-    #print("ex_names sample")
-    #print(ex_names[2*max_num_ex:3*max_num_ex])
-    #print("pre_priv sample")
-    #print(pre_priv[2*max_num_ex:3*max_num_ex])
-    #print("post_priv sample")
-    #print(post_priv[2*max_num_ex:3*max_num_ex])
-
     # build previlege access list
     pacc_list = [0 for i in range(cont_cnt)] ############### pass to c function: priviledged access
     for i in priviledged_access.keys():
         pacc_list[container_encoding[i]] = 1 if priviledged_access[i] else 0
-    #print("pacc list is")
-    #print(pacc_list)
 
     ####################################################################  
     
@@ -279,12 +261,13 @@ def breadth_first_search(topology,
     edgeLimit = 2500000
     labelPerNode = 100
 
+    # Set result type as int list
+    # The result stores the exploit labels on each edge
     bfs.restype = ctypes.POINTER(ctypes.c_int*(edgeLimit*labelPerNode))
 
     IntArrayOne = ctypes.c_uint*1
     IntArrayNode = ctypes.c_uint*nodeLimit
     IntArrayEdge = ctypes.c_uint*edgeLimit
-    #IntArrayLabel = ctypes.c_int*(edgeLimit*labelPerNode)
 
     nodeCnt = IntArrayOne(*[0])
     edgeCnt = IntArrayOne(*[0])
@@ -292,7 +275,6 @@ def breadth_first_search(topology,
     nodePriv = IntArrayNode(*[0 for i in range(nodeLimit)])
     edgeStart = IntArrayEdge(*[0 for i in range(edgeLimit)])
     edgeEnd = IntArrayEdge(*[0 for i in range(edgeLimit)])
-    #edgeLabel = IntArrayLabel(*[-1 for i in range(edgeLimit*labelPerNode)])
     
     numOpenmpThreads = 4
     initQueueSize = 4
