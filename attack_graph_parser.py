@@ -299,108 +299,46 @@ def breadth_first_search(topology,
 
     res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_name, param_docker_host_name, param_max_num_ex, nodeName, nodePriv, edgeStart, edgeEnd, nodeCnt, edgeCnt, numOpenmpThreads, initQueueSize)
 
-     
-    c_duration=time.time()-c_start
-    print("====== From Python: C execution done!!!")
-    print("Number of nodes discovered by C is", nodeCnt[0])
-    print("Number of edges discovered by C is", edgeCnt[0])
-    print("Breadth-First-Search by serial C took",c_duration,"seconds")
-    #print(res.contents[2500000*100-1])
-    #print(res.contents[0])
-    ####################################################################
-
-    bds_start = time.time()
-
-    # This is where the nodes and edges are going to be stored.
-    edges = {}
     nodes = set()
-    passed_nodes = {}
-    passed_edges = {}
+    edges = {}
 
-    # Creating the passed nodes array.
-    #for container in topology:
-    #    for privilege in ["0", "1", "2", "3", "4"]:
-    #        passed_nodes[container+"|"+privilege] = False
+    priv_dict = {0: "NONE",
+               1 : "VOS USER",
+               2 : "VOS ADMIN",
+               3: "USER",
+               4: "ADMIN"}    
 
-    # Putting the attacker in the queue
-    queue = Queue()
-    queue.put("outside|4")
-    passed_nodes["outside|4"] = True
+    # make the nodes set with the results of c_bfs
+    for i in range(nodeCnt[0]):
+        nodes.add(container_decoding[nodeName[i]]+"("+priv_dict[nodePriv[i]]+")")
 
-    # Starting the time
-    while not queue.empty():
+    # make the edges dictionary with the results of c_bfs
+        
+    for i in range(edgeCnt[0]):
+        start_id = edgeStart[i]
+        end_id = edgeEnd[i]
+        start_name = container_decoding[nodeName[start_id]]
+        end_name = container_decoding[nodeName[end_id]]
+        start_priv = priv_dict[nodePriv[start_id]]
+        end_priv = priv_dict[nodePriv[end_id]]
+        edge_key = start_name + "(" + start_priv + ")|" + end_name + "(" + end_priv + ")"
+        edges[edge_key] = []
+        labelTotal = res.contents[i*100]
+        labelStartAddress = i*100+1
+        for j in range(labelTotal):
+            exploit_value = res.contents[labelStartAddress+j]
+            if exploit_value==-1: edges[edge_key].append("root access")
+            elif exploit_value==-2: edges[edge_key].append("privileged")
+            else: edges[edge_key].append(exploit_decoding[exploit_value]) 
 
-        parts_current = queue.get().split("|")
-        current_node = parts_current[0]
-        priv_current = int(parts_current[1])
-
-        neighbours = topology[current_node]
-        if current_node != "docker host":
-            neighbours.append(current_node)
-
-        # Iterate through all of the neighbours
-        for neighbour in neighbours:
-
-            # Checks if the attacker has access to the docker host.
-            if current_node == "docker host" and passed_nodes.get(neighbour+"|4") != None:
-                # Add the edge
-                nodes, edges, passed_edges = add_edge(nodes,
-                                                      edges,
-                                                      current_node,
-                                                      "ADMIN",
-                                                      neighbour,
-                                                      "ADMIN",
-                                                      "root access",
-                                                      passed_edges)
-
-            # Checks if the container has privileged access.
-            elif neighbour == "docker host" and priviledged_access[current_node]:
-                # Add the edge
-                nodes, edges, passed_edges = add_edge(nodes,
-                                                      edges,
-                                                      current_node,
-                                                      get_priv(priv_current),
-                                                      neighbour,
-                                                      "ADMIN",
-                                                      "privileged",
-                                                      passed_edges)
-
-                queue.put(neighbour+"|4")
-                passed_nodes[neighbour+"|4"] = True
-
-            elif neighbour != "outside" and neighbour != "docker host":
-
-                precond = container_exploitability[neighbour]["precond"]
-                postcond = container_exploitability[neighbour]["postcond"]
-
-                for vul in precond.keys():
-
-                    if priv_current >= precond[vul] and \
-                       ((neighbour != current_node and postcond[vul] != 0) or \
-                        (neighbour == current_node and priv_current < postcond[vul])):
-
-                        # Add the edge
-                        nodes, edges, passed_edges = add_edge(nodes,
-                                                              edges,
-                                                              current_node,
-                                                              get_priv(priv_current),
-                                                              neighbour,
-                                                              get_priv(postcond[vul]),
-                                                              vul,
-                                                              passed_edges)
-
-                        # If the neighbour was not passed or it has a lower privilege...
-                        passed_nodes_key = neighbour + "|" + str(postcond[vul])
-                        if passed_nodes.get(passed_nodes_key) == None:
-                            # ... put it in the queue
-                            queue.put(passed_nodes_key)
-                            passed_nodes[passed_nodes_key] = True
-
-    duration_bdf = time.time()-bds_start
+    c_duration=time.time()-c_start
+    print("====== Report From Python ======") 
+    print("C-based parallel BFS done!!!")
+    print("Number of nodes in the attack graph is", len(nodes))
+    print("Number of edges in the attack graph is", len(edges))
+    print("Parallel BFS took",c_duration,"seconds")
     print()
-    print("Breadth-first-search by Python took "+str(duration_bdf)+" seconds.")
-    return nodes, edges, duration_bdf
-
+    return nodes, edges, c_duration
 
 def attack_vector_string_to_dict(av_string):
     """Transforms the attack vector string to dictionary."""
