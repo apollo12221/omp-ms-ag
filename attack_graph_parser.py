@@ -178,6 +178,11 @@ def breadth_first_search(topology,
                          priviledged_access):
     """Breadth first search approach for generation of nodes and edges
     without generating attack paths."""
+
+    print()
+    print("BFS by calling a C function from .so library now .....................")
+    print()
+    
     c_start = time.time()
     #########################################################
     # encoding all containers
@@ -189,24 +194,14 @@ def breadth_first_search(topology,
         container_decoding[cont_cnt]=i
         cont_cnt += 1
 
-    #print("===>>> container encoding dict: ")
-    #print(container_encoding)
-    #print("===>>> container decoding dict: ")
-    #print(container_decoding)
-    #print('===>>> Number of containers is', cont_cnt)
     outside_id = container_encoding['outside'] ################ pass to c function
     docker_host_id = container_encoding['docker host'] ################ pass to c function
-    #print('===>>> outside id is', outside_id)
-    #print('===>>> docker host id is', docker_host_id)
 
     # build topology matrix as 1D array
     topology_list = [0 for i in range(cont_cnt**2)] ################ pass to c function: topology matrix
     for i in topology.keys():
         for j in topology[i]:
             topology_list[container_encoding[i]*cont_cnt+container_encoding[j]]=1
-    #print('===>>> topology list samples')
-    #print(topology_list[0:2*cont_cnt])
-    #print(topology_list[-cont_cnt:cont_cnt**2])
 
     # encoding all exploits
     exploit_encoding = {}
@@ -225,10 +220,6 @@ def breadth_first_search(topology,
                 exploit_decoding[ex_total]=j
                 ex_total += 1
 
-    #print("===>>> Max number of exploits of all containers is", max_num_ex)
-    #print("===>>> Total number of encoded exploits is", ex_total)
-    #print("===>>> Number of exploits owned by each container is")
-    #print(num_ex)
     
     # build precondition name matrix as 1D array, size cont_cnt * max_num_ex
     ex_names = [-1 for i in range(cont_cnt * max_num_ex)] ############### pass to c function: initially -1 means an empty entry
@@ -242,20 +233,11 @@ def breadth_first_search(topology,
             post_priv[container_encoding[i]*max_num_ex + ex_cnt]=container_exploitability[i]['postcond'][j]
             ex_cnt += 1
 
-    #print("ex_names sample")
-    #print(ex_names[2*max_num_ex:3*max_num_ex])
-    #print("pre_priv sample")
-    #print(pre_priv[2*max_num_ex:3*max_num_ex])
-    #print("post_priv sample")
-    #print(post_priv[2*max_num_ex:3*max_num_ex])
 
     # build previlege access list
     pacc_list = [0 for i in range(cont_cnt)] ############### pass to c function: priviledged access
     for i in priviledged_access.keys():
         pacc_list[container_encoding[i]] = 1 if priviledged_access[i] else 0
-    #print("pacc list is")
-    #print(pacc_list)
-
     ####################################################################  
     
     libname = pathlib.Path().absolute()/"c_bfs.so"
@@ -299,16 +281,54 @@ def breadth_first_search(topology,
 
     res = bfs(param_topology_list, param_num_ex_list, param_ex_names_list, param_pre_priv_list, param_post_priv_list, param_pacc_list, param_cont_cnt, param_outside_name, param_docker_host_name, param_max_num_ex, nodeName, nodePriv, edgeStart, edgeEnd, nodeCnt, edgeCnt, numOpenmpThreads, initQueueSize)
 
+
+    nodes = set()
+    edges = {}
+
+    priv_dict = {0: "NONE",
+               1 : "VOS USER",
+               2 : "VOS ADMIN",
+               3: "USER",
+               4: "ADMIN"}    
+
+    # make the nodes set with the results of c_bfs
+    for i in range(nodeCnt[0]):
+        nodes.add(container_decoding[nodeName[i]]+"("+priv_dict[nodePriv[i]]+")")
+
+    # make the edges dictionary with the results of c_bfs
+        
+    for i in range(edgeCnt[0]):
+        start_id = edgeStart[i]
+        end_id = edgeEnd[i]
+        start_name = container_decoding[nodeName[start_id]]
+        end_name = container_decoding[nodeName[end_id]]
+        start_priv = priv_dict[nodePriv[start_id]]
+        end_priv = priv_dict[nodePriv[end_id]]
+        edge_key = start_name + "(" + start_priv + ")|" + end_name + "(" + end_priv + ")"
+        edges[edge_key] = []
+        labelTotal = res.contents[i*100]
+        labelStartAddress = i*100+1
+        for j in range(labelTotal):
+            exploit_value = res.contents[labelStartAddress+j]
+            if exploit_value==-1: edges[edge_key].append("root access")
+            elif exploit_value==-2: edges[edge_key].append("privileged")
+            else: edges[edge_key].append(exploit_decoding[exploit_value]) 
+
+
+
      
     c_duration=time.time()-c_start
     print("====== From Python: C execution done!!!")
     print("Number of nodes discovered by C is", nodeCnt[0])
     print("Number of edges discovered by C is", edgeCnt[0])
-    print("Breadth-First-Search by serial C took",c_duration,"seconds")
-    #print(res.contents[2500000*100-1])
-    #print(res.contents[0])
+    print("********************************************************************************")
+    print("*** Data preparation + C-based BFS + memory transfer took",c_duration,"seconds ***")
+    print("********************************************************************************")
     ####################################################################
 
+    print()
+    print("BFS by the original python code now ...................")
+    print()
     bds_start = time.time()
 
     # This is where the nodes and edges are going to be stored.
@@ -316,11 +336,6 @@ def breadth_first_search(topology,
     nodes = set()
     passed_nodes = {}
     passed_edges = {}
-
-    # Creating the passed nodes array.
-    #for container in topology:
-    #    for privilege in ["0", "1", "2", "3", "4"]:
-    #        passed_nodes[container+"|"+privilege] = False
 
     # Putting the attacker in the queue
     queue = Queue()
@@ -398,7 +413,9 @@ def breadth_first_search(topology,
 
     duration_bdf = time.time()-bds_start
     print()
-    print("Breadth-first-search by Python took "+str(duration_bdf)+" seconds.")
+    print("******************************************************************")
+    print("**** Breadth-first-search by Python took "+str(duration_bdf)+" seconds. ****")
+    print("******************************************************************")
     return nodes, edges, duration_bdf
 
 
